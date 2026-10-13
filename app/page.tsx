@@ -274,10 +274,14 @@ export default function Dashboard() {
   const load = useCallback(async () => {
     if (
       !ready ||
-      !["discover", "watchlist"].includes(section) ||
-      Date.now() < (cooldown.current[source] ?? 0)
+      !["discover", "watchlist"].includes(section)
     )
       return;
+    if(Date.now() < (cooldown.current[source] ?? 0)) {
+      setLoading(false);
+      setError("This data source is cooling down. Retry after " + new Date(cooldown.current[source]).toLocaleString() + ".");
+      return;
+    }
     const id = ++requestId.current;
     if (section === "watchlist" && !watchlist.length) {
       setData({
@@ -892,6 +896,7 @@ export default function Dashboard() {
                         value={source}
                         onChange={(e) => {
                           setSource(e.target.value as Source | "auto");
+                          setData(null);
                           setQuery("");
                           setSearch("");
                         }}
@@ -913,7 +918,7 @@ export default function Dashboard() {
                       </button>
                       <button
                         className="text-button"
-                        onClick={() => setSource("demo")}
+                        onClick={() => {setData(null);setSource("demo");}}
                       >
                         Explore with demo data
                       </button>
@@ -952,7 +957,7 @@ export default function Dashboard() {
                       </button>
                       <button
                         className="text-button"
-                        onClick={() => setSource("demo")}
+                        onClick={() => {setData(null);setSource("demo");}}
                       >
                         Try the demo
                       </button>
