@@ -88,7 +88,7 @@ const builtins: Preset[] = [
 const money = (n: number | null) =>
   n === null
     ? "—"
-    : "$" +
+    : n > 0 && n < 0.01 ? "<$0.01" : "$" +
       new Intl.NumberFormat("en-US", {
         notation: "compact",
         maximumFractionDigits: 2,
@@ -100,6 +100,7 @@ const price = (n: number | null) =>
       new Intl.NumberFormat("en-US", { maximumSignificantDigits: 5 }).format(n);
 const percent = (n: number | null) =>
   n === null ? "—" : (n > 0 ? "+" : "") + n.toFixed(1) + "%";
+function sumKnown(tokens:Token[],field:"liquidity"|"volume"):number|null { const values=tokens.map(t=>t[field]).filter((n):n is number=>n!==null); return tokens.length && !values.length ? null : values.reduce((a,n)=>a+n,0); }
 function age(t: number | null) {
   if (t === null) return "—";
   const m = Math.max(0, (Date.now() / 1000 - t) / 60);
@@ -702,13 +703,13 @@ export default function Dashboard() {
                 <Metric
                   label="Combined liquidity"
                   value={money(
-                    tokens.reduce((a, t) => a + (t.liquidity ?? 0), 0),
+                    sumKnown(tokens,"liquidity"),
                   )}
                   note="Across filtered tokens only"
                 />
                 <Metric
                   label={`${volumeInterval} trading volume`}
-                  value={money(tokens.reduce((a, t) => a + (t.volume ?? 0), 0))}
+                  value={money(sumKnown(tokens,"volume"))}
                   note="Across filtered tokens only"
                 />
                 <div className="feed-metric">
