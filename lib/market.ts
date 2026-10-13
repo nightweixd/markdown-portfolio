@@ -71,11 +71,12 @@ export async function gmgn(
 ): Promise<any> {
   if (!env.GMGN_API_KEY)
     throw new MarketError("GMGN API key is not configured on the server.", 503);
-  if (gmgnCooldownUntil > Date.now())
+  const cooldownUntil = Math.max(gmgnCooldownUntil, Number(env.GMGN_RETRY_AFTER ?? 0)*1000);
+  if (cooldownUntil > Date.now())
     throw new MarketError(
       "GMGN cooldown is active.",
       429,
-      Math.ceil(gmgnCooldownUntil / 1000),
+      Math.ceil(cooldownUntil / 1000),
       "gmgn",
     );
   const params = new URLSearchParams({
@@ -90,6 +91,7 @@ export async function gmgn(
       headers: {
         "X-APIKEY": env.GMGN_API_KEY,
         "Content-Type": "application/json",
+        "User-Agent": "gmgn-cli/1.6.6",
       },
       ...(body ? { body: JSON.stringify(body) } : {}),
     },
@@ -119,7 +121,7 @@ export async function market(
   query = "",
 ): Promise<Result> {
   const actual: Source =
-    source === "auto" ? (env.GMGN_API_KEY ? "gmgn" : "dexscreener") : source;
+    source === "auto" ? (env.DEFAULT_DATA_SOURCE === "dexscreener" ? "dexscreener" : env.GMGN_API_KEY ? "gmgn" : "dexscreener") : source;
   const key = JSON.stringify([
     actual,
     view,
@@ -143,7 +145,7 @@ async function fetchMarket(
   query = "",
 ): Promise<Result> {
   const actual: Source =
-    source === "auto" ? (env.GMGN_API_KEY ? "gmgn" : "dexscreener") : source;
+    source === "auto" ? (env.DEFAULT_DATA_SOURCE === "dexscreener" ? "dexscreener" : env.GMGN_API_KEY ? "gmgn" : "dexscreener") : source;
   const key = JSON.stringify([
     actual,
     view,

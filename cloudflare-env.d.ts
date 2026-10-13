@@ -9,5 +9,7 @@ declare namespace Cloudflare {
     CRON_SECRET?: string;
     APP_PASSWORD?: string;
     STANDALONE_CLOUDFLARE?: string;
+    DEFAULT_DATA_SOURCE?: string;
+    GMGN_RETRY_AFTER?: string;
   }
 }
