@@ -16,6 +16,7 @@ export class MarketError extends Error {
     message: string,
     public status = 502,
     public retryAt: number | null = null,
+    public provider: Source | null = null,
   ) {
     super(message);
   }
@@ -48,6 +49,7 @@ async function jsonFetch(url: string, init?: RequestInit): Promise<any> {
       "Data provider rate limit reached. Refresh pauses until the cooldown ends.",
       429,
       reset,
+      url.startsWith("https://openapi.gmgn.ai/") ? "gmgn" : "dexscreener",
     );
   }
   if (
@@ -74,6 +76,7 @@ export async function gmgn(
       "GMGN cooldown is active.",
       429,
       Math.ceil(gmgnCooldownUntil / 1000),
+      "gmgn",
     );
   const params = new URLSearchParams({
     ...query,
@@ -107,7 +110,32 @@ export async function gmgn(
   }
   return payload;
 }
+const inFlight = new Map<string, Promise<Result>>();
 export async function market(
+  source: Source | "auto",
+  view: View,
+  interval: Interval,
+  addresses: string[] = [],
+  query = "",
+): Promise<Result> {
+  const actual: Source =
+    source === "auto" ? (env.GMGN_API_KEY ? "gmgn" : "dexscreener") : source;
+  const key = JSON.stringify([
+    actual,
+    view,
+    interval,
+    addresses.slice(0, 30),
+    query,
+  ]);
+  const existing = inFlight.get(key);
+  if (existing) return existing;
+  const pending = fetchMarket(actual, view, interval, addresses, query).finally(
+    () => inFlight.delete(key),
+  );
+  inFlight.set(key, pending);
+  return pending;
+}
+async function fetchMarket(
   source: Source | "auto",
   view: View,
   interval: Interval,

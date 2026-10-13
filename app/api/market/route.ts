@@ -43,6 +43,7 @@ export async function GET(request: Request) {
       {
         error: e instanceof Error ? e.message : "Market request failed",
         retryAt: e instanceof MarketError ? e.retryAt : null,
+        provider: e instanceof MarketError ? e.provider : null,
       },
       { status: e instanceof MarketError ? e.status : 502 },
     );

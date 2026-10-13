@@ -88,11 +88,13 @@ const builtins: Preset[] = [
 const money = (n: number | null) =>
   n === null
     ? "—"
-    : n > 0 && n < 0.01 ? "<$0.01" : "$" +
-      new Intl.NumberFormat("en-US", {
-        notation: "compact",
-        maximumFractionDigits: 2,
-      }).format(n);
+    : n > 0 && n < 0.01
+      ? "<$0.01"
+      : "$" +
+        new Intl.NumberFormat("en-US", {
+          notation: "compact",
+          maximumFractionDigits: 2,
+        }).format(n);
 const price = (n: number | null) =>
   n === null
     ? "—"
@@ -100,7 +102,17 @@ const price = (n: number | null) =>
       new Intl.NumberFormat("en-US", { maximumSignificantDigits: 5 }).format(n);
 const percent = (n: number | null) =>
   n === null ? "—" : (n > 0 ? "+" : "") + n.toFixed(1) + "%";
-function sumKnown(tokens:Token[],field:"liquidity"|"volume"):number|null { const values=tokens.map(t=>t[field]).filter((n):n is number=>n!==null); return tokens.length && !values.length ? null : values.reduce((a,n)=>a+n,0); }
+function sumKnown(
+  tokens: Token[],
+  field: "liquidity" | "volume",
+): number | null {
+  const values = tokens
+    .map((t) => t[field])
+    .filter((n): n is number => n !== null);
+  return tokens.length && !values.length
+    ? null
+    : values.reduce((a, n) => a + n, 0);
+}
 function age(t: number | null) {
   if (t === null) return "—";
   const m = Math.max(0, (Date.now() / 1000 - t) / 60);
@@ -202,7 +214,7 @@ export default function Dashboard() {
     [events, setEvents] = useState<{ text: string; time: number }[]>([]),
     [alertsOn, setAlertsOn] = useState(false),
     [busy, setBusy] = useState(false);
-  const cooldown = useRef(0),
+  const cooldown = useRef<Record<string, number>>({}),
     requestId = useRef(0),
     seen = useRef(new Map<string, Set<string>>()),
     dialogRef = useRef<HTMLDialogElement>(null);
@@ -263,7 +275,7 @@ export default function Dashboard() {
     if (
       !ready ||
       !["discover", "watchlist"].includes(section) ||
-      Date.now() < cooldown.current
+      Date.now() < (cooldown.current[source] ?? 0)
     )
       return;
     const id = ++requestId.current;
@@ -291,12 +303,24 @@ export default function Dashboard() {
       const body = (await response.json()) as Data & {
         error?: string;
         retryAt?: number;
+        provider?: Source;
       };
       if (id !== requestId.current) return;
       if (!response.ok) {
         if (response.status === 401) setSignedOut(true);
-        if (body.retryAt) cooldown.current = body.retryAt * 1000;
-        throw new Error(body.error ?? "Market request failed");
+        if (body.retryAt) {
+          cooldown.current[source] = body.retryAt * 1000;
+          if (body.provider)
+            cooldown.current[body.provider] = body.retryAt * 1000;
+        }
+        throw new Error(
+          (body.error ?? "Market request failed") +
+            (body.retryAt
+              ? " Retry after " +
+                new Date(body.retryAt * 1000).toLocaleString() +
+                "."
+              : ""),
+        );
       }
       setSignedOut(false);
       setData(body);
@@ -537,6 +561,7 @@ export default function Dashboard() {
               className={section === n.id ? "nav-item active" : "nav-item"}
               onClick={() => chooseSection(n.id)}
               aria-current={section === n.id ? "page" : undefined}
+              aria-label={n.label}
             >
               <n.icon size={19} />
               <span>{n.label}</span>
@@ -702,14 +727,12 @@ export default function Dashboard() {
                 />
                 <Metric
                   label="Combined liquidity"
-                  value={money(
-                    sumKnown(tokens,"liquidity"),
-                  )}
+                  value={money(sumKnown(tokens, "liquidity"))}
                   note="Across filtered tokens only"
                 />
                 <Metric
                   label={`${volumeInterval} trading volume`}
-                  value={money(sumKnown(tokens,"volume"))}
+                  value={money(sumKnown(tokens, "volume"))}
                   note="Across filtered tokens only"
                 />
                 <div className="feed-metric">
