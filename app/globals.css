@@ -1827,3 +1827,16 @@ code {
     grid-row: 7;
   }
 }
+.table-scroll {
+  max-height: 620px;
+}
+thead {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+@media (max-width: 640px) {
+  .table-scroll {
+    max-height: 500px;
+  }
+}

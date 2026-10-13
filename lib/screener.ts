@@ -188,7 +188,9 @@ export function normalizeGmgn(
       50,
     ),
     price: numeric(row.price),
-    marketCap: numeric(trenches ? row.usd_market_cap : row.market_cap),
+    marketCap: numeric(
+      trenches ? (row.usd_market_cap ?? row.market_cap) : row.market_cap,
+    ),
     liquidity: numeric(row.liquidity),
     volume: numeric(
       trenches

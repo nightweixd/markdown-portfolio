@@ -8,7 +8,7 @@ A personal BNB Smart Chain screener built with React, Vinext and Cloudflare Work
 - Liquidity, volume, cap, age, change and concentration filters. Missing fields cannot pass an active numerical filter.
 - Browser-local watchlist (30 contracts), saved presets and settings export.
 - DEX Screener public market data without credentials. This discovers recent profiles and paid boosts, not every new BSC token. New means pairs younger than 24h; pair age is not contract age.
-- GMGN read-only rankings and launchpad adapter, pending your GMGN key and real response validation. No trade execution or signing key.
+- GMGN read-only rankings, launchpad listings, contract details and search. The key is configured and BSC market access is verified. No trade execution or signing key is used by the website.
 - Chainbase indexed holder count and top balances fetched on selection and cached for five minutes. Pools and burn addresses remain included; no concentration score is invented when supply is unavailable.
 - Page notifications for new rule matches on later refreshes of the loaded view.
 - D1-backed rules and Telegram monitor, pending your bot secrets and schedule. Delivery is limited to one notification per token/rule/UTC hour. Demo tokens never send.
@@ -72,4 +72,4 @@ The first browser alert refresh establishes a baseline. Watchlist page alerts se
 
 ## Current verification limits
 
-GMGN live responses and Telegram delivery cannot be tested until their credentials are provided. Deployment to your own Cloudflare account also needs your Cloudflare sign-in. Provider coverage and API quotas can change. No buying, selling or wallet access is implemented.
+GMGN BSC rankings, launchpad listings and Chainbase holder access were tested through the CLI and local dashboard. Telegram delivery still needs your bot credentials and schedule. Deployment to your own Cloudflare account needs your Cloudflare sign-in. Provider coverage and API quotas can change. No buying, selling or wallet access is implemented.

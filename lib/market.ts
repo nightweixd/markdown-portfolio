@@ -5,6 +5,7 @@ import {
   deduplicate,
   normalizeDex,
   normalizeGmgn,
+  numeric,
   type Interval,
   type Source,
   type Token,
@@ -79,14 +80,32 @@ export async function gmgn(
     timestamp: String(Math.floor(Date.now() / 1000)),
     client_id: crypto.randomUUID(),
   });
-  return jsonFetch("https://openapi.gmgn.ai" + path + "?" + params, {
-    method: body ? "POST" : "GET",
-    headers: {
-      "X-APIKEY": env.GMGN_API_KEY,
-      "Content-Type": "application/json",
+  const result = await jsonFetch(
+    "https://openapi.gmgn.ai" + path + "?" + params,
+    {
+      method: body ? "POST" : "GET",
+      headers: {
+        "X-APIKEY": env.GMGN_API_KEY,
+        "Content-Type": "application/json",
+      },
+      ...(body ? { body: JSON.stringify(body) } : {}),
     },
-    ...(body ? { body: JSON.stringify(body) } : {}),
-  });
+  );
+  let payload = result;
+  for (
+    let i = 0;
+    i < 3 &&
+    payload &&
+    typeof payload === "object" &&
+    "code" in payload &&
+    "data" in payload;
+    i++
+  ) {
+    if (![0, 200, "0", "200"].includes(payload.code))
+      throw new MarketError("GMGN could not complete this request.");
+    payload = payload.data;
+  }
+  return payload;
 }
 export async function market(
   source: Source | "auto",
@@ -124,11 +143,43 @@ export async function market(
     coverage =
       "Fictional sample tokens. Demo mode is for trying the dashboard; no live prices or Telegram alerts.";
   } else if (actual === "gmgn") {
-    if (query || addresses.length) {
+    if (addresses.length || addressPattern.test(query)) {
+      const ids = addresses.length ? addresses.slice(0, 30) : [query];
+      for (const address of ids) {
+        const info = await gmgn("/v1/token/info", { chain: "bsc", address });
+        const p = info.price ?? {};
+        const current = numeric(p.price);
+        const previous = numeric(p["price_" + interval]);
+        const supply = numeric(info.circulating_supply);
+        const t = normalizeGmgn(
+          {
+            ...info,
+            price: current,
+            market_cap:
+              current !== null && supply !== null ? current * supply : null,
+            volume: p["volume_" + interval],
+            buys: p["buys_" + interval],
+            sells: p["sells_" + interval],
+            price_change_percent:
+              current !== null && previous !== null && previous > 0
+                ? (current / previous - 1) * 100
+                : null,
+            top_10_holder_rate: info.stat?.top_10_holder_rate,
+          },
+          interval,
+        );
+        if (t) tokens.push(t);
+        // A personal watchlist is bounded; pace detail calls for the free API bucket.
+        if (ids.length > 1)
+          await new Promise((resolve) => setTimeout(resolve, 600));
+      }
+      coverage =
+        "GMGN BSC contract details. Market cap is price × circulating supply; interval change compares reported prices. Security fields not returned by token info remain unknown.";
+    } else if (query) {
       const terms = query ? [query] : addresses.slice(0, 30);
       for (const term of terms) {
         const r = await gmgn("/v1/market/search", { chain: "bsc", q: term });
-        const coins = r.data?.coins ?? [];
+        const coins = r.coins ?? [];
         for (const coin of coins) {
           if (coin.chain !== "bsc") continue;
           const token = normalizeGmgn(
@@ -158,8 +209,14 @@ export async function market(
           completed: section,
         },
       );
-      for (const name of ["new_creation", "pump", "completed"]) {
-        const rows = r.data?.[name];
+      const payload = r.data ?? r;
+      for (const name of [
+        "new_creation",
+        "pump",
+        "near_completion",
+        "completed",
+      ]) {
+        const rows = payload[name];
         const items = Array.isArray(rows) ? rows : rows?.list;
         if (Array.isArray(items))
           for (const row of items) {
@@ -177,7 +234,7 @@ export async function market(
         order_by: "volume",
         direction: "desc",
       });
-      tokens = (r.data?.rank ?? [])
+      tokens = (r.rank ?? [])
         .map((row: Record<string, unknown>) => normalizeGmgn(row, interval))
         .filter(Boolean);
       coverage =
